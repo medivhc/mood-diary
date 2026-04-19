@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>心情日记</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      touch-action: none;
+      user-select: none;
+    }
+    
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 30px;
+    }
+    
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    }
+    
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .mood-selector {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    
+    .mood-option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      padding: 10px;
+      border-radius: 12px;
+      flex: 1;
+    }
+    
+    .mood-option:hover {
+      background: #f5f5f5;
+    }
+    
+    .mood-option.selected {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      transform: scale(1.1);
+    }
+    
+    .mood-option.selected .emoji {
+      filter: none;
+    }
+    
+    .mood-option.selected .label {
+      color: white;
+    }
+    
+    .emoji {
+      font-size: 36px;
+      filter: grayscale(0.3);
+      transition: all 0.3s ease;
+    }
+    
+    .label {
+      font-size: 12px;
+      color: #666;
+      text-align: center;
+    }
+    
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      font-size: 16px;
+      resize: none;
+      transition: border-color 0.3s ease;
+      font-family: inherit;
+    }
+    
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 12px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    
+    .stat-item {
+      text-align: center;
+      padding: 16px;
+      background: #f8f9fa;
+      border-radius: 12px;
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #667eea;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+    
+    .chart-container {
+      position: relative;
+      height: 200px;
+      margin-top: 20px;
+    }
+    
+    .achievements {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    
+    .achievement {
+      text-align: center;
+      padding: 12px 8px;
+      background: #f8f9fa;
+      border-radius: 12px;
+      opacity: 0.4;
+      transition: all 0.3s ease;
+    }
+    
+    .achievement.unlocked {
+      opacity: 1;
+      background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+      transform: scale(1.05);
+    }
+    
+    .achievement-emoji {
+      font-size: 28px;
+      margin-bottom: 4px;
+    }
+    
+    .achievement-name {
+      font-size: 10px;
+      color: #666;
+    }
+    
+    .achievement.unlocked .achievement-name {
+      color: #333;
+      font-weight: 600;
+    }
+    
+    .history-list {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    
+    .history-item {
+      padding: 16px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    
+    .history-item:last-child {
+      border-bottom: none;
+    }
+    
+    .history-emoji {
+      font-size: 32px;
+      flex-shrink: 0;
+    }
+    
+    .history-content {
+      flex: 1;
+    }
+    
+    .history-date {
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 4px;
+    }
+    
+    .history-text {
+      font-size: 14px;
+      color: #333;
+      line-height: 1.5;
+    }
+    
+    .history-analysis {
+      font-size: 12px;
+      color: #667eea;
+      margin-top: 8px;
+      padding: 8px;
+      background: #f0f0ff;
+      border-radius: 8px;
+    }
+    
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    
+    .tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      background: rgba(255,255,255,0.2);
+      border-radius: 12px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 500;
+    }
+    
+    .tab.active {
+      background: white;
+      color: #667eea;
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: white;
+    }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #333;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 24px;
+      font-size: 14px;
+      opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+    
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    
+    .ai-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📔 心情日记</h1>
+      <p id="greeting">记录你的每一天</p>
+    </div>
+    
+    <div class="tabs">
+      <div class="tab active" data-tab="write">✍️ 写日记</div>
+      <div class="tab" data-tab="stats">📊 统计</div>
+      <div class="tab" data-tab="history">📜 历史</div>
+      <div class="tab" data-tab="achievements">🏆 成就</div>
+    </div>
+    
+    <!-- 写日记页面 -->
+    <div class="tab-content active" id="write-tab">
+      <div class="card">
+        <div class="card-title">
+          <span>今天心情如何？</span>
+        </div>
+        
+        <div class="mood-selector">
+          <div class="mood-option" data-mood="5" data-emoji="🤩">
+            <span class="emoji">🤩</span>
+            <span class="label">超棒</span>
+          </div>
+          <div class="mood-option" data-mood="4" data-emoji="😊">
+            <span class="emoji">😊</span>
+            <span class="label">开心</span>
+          </div>
+          <div class="mood-option" data-mood="3" data-emoji="😐">
+            <span class="emoji">😐</span>
+            <span class="label">一般</span>
+          </div>
+          <div class="mood-option" data-mood="2" data-emoji="😔">
+            <span class="emoji">😔</span>
+            <span class="label">低落</span>
+          </div>
+          <div class="mood-option" data-mood="1" data-emoji="😢">
+            <span class="emoji">😢</span>
+            <span class="label">难过</span>
+          </div>
+        </div>
+        
+        <textarea id="diary-text" placeholder="今天发生了什么？有什么想记录的吗？"></textarea>
+        
+        <button class="btn btn-primary" id="save-btn" disabled>
+          💾 保存日记
+        </button>
+      </div>
+    </div>
+    
+    <!-- 统计页面 -->
+    <div class="tab-content" id="stats-tab">
+      <div class="card">
+        <div class="card-title">
+          <span>情绪统计</span>
+        </div>
+        
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="total-days">0</div>
+            <div class="stat-label">记录天数</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="avg-mood">-</div>
+            <div class="stat-label">平均心情</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="streak">0</div>
+            <div class="stat-label">连续记录</div>
+          </div>
+        </div>
+        
+        <div class="chart-container">
+          <canvas id="mood-chart"></canvas>
+        </div>
+        
+        <div id="ai-analysis" style="margin-top: 20px; padding: 16px; background: #f0f0ff; border-radius: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+            <span>🤖</span>
+            <strong>AI 情绪分析</strong>
+            <span class="ai-badge">AI</span>
+          </div>
+          <p id="ai-text" style="font-size: 14px; color: #555; line-height: 1.6;">
+            记录更多日记后，AI 会为你分析情绪模式哦~
+          </p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 历史页面 -->
+    <div class="tab-content" id="history-tab">
+      <div class="card">
+        <div class="card-title">
+          <span>日记历史</span>
+        </div>
+        <div class="history-list" id="history-list">
+          <div style="text-align: center; padding: 40px; color: #999;">
+            还没有日记，开始记录吧~
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 成就页面 -->
+    <div class="tab-content" id="achievements-tab">
+      <div class="card">
+        <div class="card-title">
+          <span>成就徽章</span>
+        </div>
+        <div class="achievements" id="achievements-list">
+          <!-- 成就将通过 JS 动态生成 -->
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="toast" id="toast"></div>
+  
+  <script>
+    // Telegram Web App 初始化
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+    
+    // 获取用户信息
+    const user = tg.initDataUnsafe?.user || { first_name: '朋友' };
+    document.getElementById('greeting').textContent = `${user.first_name}，记录你的每一天`;
+    
+    // 数据存储
+    const STORAGE_KEY = 'mood_diary_data';
+    let diaryData = {
+      entries: [],
+      achievements: []
+    };
+    
+    // 加载数据
+    function loadData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        diaryData = JSON.parse(saved);
+      }
+    }
+    
+    // 保存数据
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(diaryData));
+    }
+    
+    // 当前选择的心情
+    let selectedMood = null;
+    let selectedEmoji = null;
+    
+    // 心情选项点击
+    document.querySelectorAll('.mood-option').forEach(option => {
+      option.addEventListener('click', () => {
+        document.querySelectorAll('.mood-option').forEach(o => o.classList.remove('selected'));
+        option.classList.add('selected');
+        selectedMood = parseInt(option.dataset.mood);
+        selectedEmoji = option.dataset.emoji;
+        updateSaveButton();
+      });
+    });
+    
+    // 文本输入
+    const textArea = document.getElementById('diary-text');
+    textArea.addEventListener('input', updateSaveButton);
+    
+    // 更新保存按钮状态
+    function updateSaveButton() {
+      const btn = document.getElementById('save-btn');
+      btn.disabled = !(selectedMood && textArea.value.trim());
+    }
+    
+    // 保存日记
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      const text = textArea.value.trim();
+      if (!selectedMood || !text) return;
+      
+      const entry = {
+        id: Date.now(),
+        date: new Date().toISOString(),
+        mood: selectedMood,
+        emoji: selectedEmoji,
+        text: text,
+        analysis: await generateAIAnalysis(text, selectedMood)
+      };
+      
+      diaryData.entries.unshift(entry);
+      saveData();
+      
+      // 检查成就
+      checkAchievements();
+      
+      showToast('日记已保存！✨');
+      
+      // 重置表单
+      selectedMood = null;
+      selectedEmoji = null;
+      document.querySelectorAll('.mood-option').forEach(o => o.classList.remove('selected'));
+      textArea.value = '';
+      updateSaveButton();
+      
+      // 刷新统计和历史
+      updateStats();
+      updateHistory();
+      updateAchievements();
+      
+      // 发送数据到 Bot
+      sendToBot(entry);
+    });
+    
+    // 简单的 AI 分析生成
+    async function generateAIAnalysis(text, mood) {
+      const moodWords = {
+        5: ['积极', '乐观', '充满活力', '感恩'],
+        4: ['愉快', '满足', '轻松', '温暖'],
+        3: ['平静', '日常', '稳定', '中性'],
+        2: ['疲惫', '压力', '焦虑', '需要休息'],
+        1: ['难过', '沮丧', '需要支持', '会过去的']
+      };
+      
+      const encouragements = [
+        "继续保持这份美好心情！",
+        "每一天都是新的开始，加油！",
+        "平淡的日子里也有小确幸~",
+        "休息一下，明天会更好！",
+        "抱抱你，一切都会好起来的💕"
+      ];
+      
+      const keywords = extractKeywords(text);
+      const analysis = `今天你的心情关键词是：**${moodWords[mood][Math.floor(Math.random() * moodWords[mood].length)]}**。${encouragements[6-mood]}`;
+      
+      if (keywords.length > 0) {
+        return analysis + ` 提到了：${keywords.join('、')}`;
+      }
+      
+      return analysis;
+    }
+    
+    // 提取关键词
+    function extractKeywords(text) {
+      const commonWords = ['今天', '工作', '学习', '朋友', '家人', '吃饭', '睡觉', '天气', '心情', '感觉', '开心', '难过', '累', '忙'];
+      const found = [];
+      commonWords.forEach(word => {
+        if (text.includes(word)) found.push(word);
+      });
+      return found.slice(0, 3);
+    }
+    
+    // 发送到 Bot
+    function sendToBot(entry) {
+      // 通过 Telegram Web App sendData 发送
+      const data = {
+        type: 'diary_entry',
+        entry: entry
+      };
+      tg.sendData(JSON.stringify(data));
+    }
+    
+    // 更新统计
+    function updateStats() {
+      const entries = diaryData.entries;
+      document.getElementById('total-days').textContent = entries.length;
+      
+      if (entries.length > 0) {
+        const avgMood = (entries.reduce((sum, e) => sum + e.mood, 0) / entries.length).toFixed(1);
+        const moodEmojis = {5: '🤩', 4: '😊', 3: '😐', 2: '😔', 1: '😢'};
+        document.getElementById('avg-mood').textContent = moodEmojis[Math.round(avgMood)] || avgMood;
+        
+        // 计算连续记录
+        let streak = 1;
+        const now = new Date();
+        for (let i = 1; i < entries.length; i++) {
+          const prevDate = new Date(entries[i-1].date);
+          const currDate = new Date(entries[i].date);
+          const diff = (prevDate - currDate) / (1000 * 60 * 60 * 24);
+          if (diff <= 1.5) streak++;
+          else break;
+        }
+        document.getElementById('streak').textContent = streak;
+        
+        // 更新图表
+        updateChart(entries.slice(0, 7).reverse());
+        
+        // AI 分析
+        updateAIAnalysis(entries);
+      }
+    }
+    
+    // 更新图表
+    let moodChart = null;
+    function updateChart(entries) {
+      const ctx = document.getElementById('mood-chart').getContext('2d');
+      
+      if (moodChart) {
+        moodChart.destroy();
+      }
+      
+      const labels = entries.map(e => {
+        const date = new Date(e.date);
+        return `${date.getMonth()+1}/${date.getDate()}`;
+      });
+      
+      const data = entries.map(e => e.mood);
+      
+      moodChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '心情',
+            data: data,
+            borderColor: '#667eea',
+            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+            tension: 0.4,
+            fill: true,
+            pointBackgroundColor: '#667eea',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            }
+          },
+          scales: {
+            y: {
+              min: 0.5,
+              max: 5.5,
+              ticks: {
+                stepSize: 1,
+                callback: function(value) {
+                  const emojis = {1: '😢', 2: '😔', 3: '😐', 4: '😊', 5: '🤩'};
+                  return emojis[value] || value;
+                }
+              },
+              grid: {
+                display: false
+              }
+            },
+            x: {
+              grid: {
+                display: false
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    // 更新 AI 分析
+    function updateAIAnalysis(entries) {
+      if (entries.length < 3) {
+        document.getElementById('ai-text').textContent = '再记录一些日记，AI 会为你分析情绪模式哦~';
+        return;
+      }
+      
+      const avgMood = entries.reduce((sum, e) => sum + e.mood, 0) / entries.length;
+      const trends = [];
+      
+      if (avgMood >= 4) {
+        trends.push('整体情绪非常积极');
+      } else if (avgMood >= 3) {
+        trends.push('情绪状态比较稳定');
+      } else {
+        trends.push('最近可能有些疲惫，记得照顾好自己');
+      }
+      
+      // 找出最常提到的词
+      const wordCount = {};
+      entries.forEach(e => {
+        const words = extractKeywords(e.text);
+        words.forEach(w => {
+          wordCount[w] = (wordCount[w] || 0) + 1;
+        });
+      });
+      
+      const topWords = Object.entries(wordCount)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(w => w[0]);
+      
+      if (topWords.length > 0) {
+        trends.push(`经常出现：${topWords.join('、')}`);
+      }
+      
+      document.getElementById('ai-text').textContent = trends.join('。') + '。';
+    }
+    
+    // 更新历史
+    function updateHistory() {
+      const list = document.getElementById('history-list');
+      
+      if (diaryData.entries.length === 0) {
+        list.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">还没有日记，开始记录吧~</div>';
+        return;
+      }
+      
+      list.innerHTML = diaryData.entries.map(entry => {
+        const date = new Date(entry.date);
+        const dateStr = date.toLocaleDateString('zh-CN', { 
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        
+        return `
+          <div class="history-item">
+            <div class="history-emoji">${entry.emoji}</div>
+            <div class="history-content">
+              <div class="history-date">${dateStr}</div>
+              <div class="history-text">${entry.text}</div>
+              ${entry.analysis ? `<div class="history-analysis">${entry.analysis}</div>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    // 成就系统
+    const allAchievements = [
+      { id: 'first_entry', emoji: '🌱', name: '第一次记录', condition: (d) => d.entries.length >= 1 },
+      { id: 'three_days', emoji: '🌿', name: '三日新人', condition: (d) => d.entries.length >= 3 },
+      { id: 'week_streak', emoji: '🔥', name: '周记达人', condition: (d) => d.entries.length >= 7 },
+      { id: 'month_streak', emoji: '🏆', name: '月度坚持', condition: (d) => d.entries.length >= 30 },
+      { id: 'happy_day', emoji: '⭐', name: '开心时刻', condition: (d) => d.entries.some(e => e.mood >= 4) },
+      { id: 'honest_day', emoji: '💙', name: '真实面对', condition: (d) => d.entries.some(e => e.mood <= 2) },
+      { id: 'wordsmith', emoji: '✍️', name: '文字达人', condition: (d) => d.entries.some(e => e.text.length >= 100) },
+      { id: 'night_owl', emoji: '🦉', name: '深夜思考', condition: (d) => d.entries.some(e => new Date(e.date).getHours() >= 23) }
+    ];
+    
+    function checkAchievements() {
+      allAchievements.forEach(ach => {
+        if (ach.condition(diaryData) && !diaryData.achievements.includes(ach.id)) {
+          diaryData.achievements.push(ach.id);
+          showToast(`🏆 解锁新成就：${ach.name}！`);
+        }
+      });
+      saveData();
+    }
+    
+    function updateAchievements() {
+      const list = document.getElementById('achievements-list');
+      list.innerHTML = allAchievements.map(ach => {
+        const unlocked = diaryData.achievements.includes(ach.id);
+        return `
+          <div class="achievement ${unlocked ? 'unlocked' : ''}">
+            <div class="achievement-emoji">${ach.emoji}</div>
+            <div class="achievement-name">${ach.name}</div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    // Tab 切换
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        tab.classList.add('active');
+        document.getElementById(`${tab.dataset.tab}-tab`).classList.add('active');
+        
+        // 刷新对应内容
+        if (tab.dataset.tab === 'stats') {
+          updateStats();
+        } else if (tab.dataset.tab === 'history') {
+          updateHistory();
+        } else if (tab.dataset.tab === 'achievements') {
+          updateAchievements();
+        }
+      });
+    });
+    
+    // Toast 提示
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2000);
+    }
+    
+    // 初始化
+    loadData();
+    updateStats();
+    updateHistory();
+    updateAchievements();
+    
+    // 监听 Bot 消息
+    tg.onEvent('mainButtonClicked', () => {
+      console.log('Main button clicked');
+    });
+  </script>
+</body>
+</html>
